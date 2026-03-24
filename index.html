@@ -448,12 +448,29 @@ const REWARDS = [
   { type:'Zoology & Science', emoji:'🐨', text:`Wombats produce <em>cube-shaped droppings</em> — the only known animal in the world to do so. In 2019, researchers identified the mechanism: varying elasticity in the wombat's intestine shapes the material as it forms. This work won an Ig Nobel Prize. A genuinely excellent use of a doctorate.` },
 ];
 
-let usedIdx = [];
+// Persist used reward indices across sessions so the same fact never repeats on reload
+function loadUsedIdx() {
+  try {
+    const stored = localStorage.getItem('sudoku_used_rewards');
+    if (stored) {
+      const arr = JSON.parse(stored);
+      // Reset if all rewards have been seen
+      if (arr.length >= REWARDS.length) { localStorage.removeItem('sudoku_used_rewards'); return []; }
+      return arr;
+    }
+  } catch(e) {}
+  return [];
+}
+function saveUsedIdx(arr) {
+  try { localStorage.setItem('sudoku_used_rewards', JSON.stringify(arr)); } catch(e) {}
+}
+
 function getNextReward() {
-  if (usedIdx.length >= REWARDS.length) usedIdx = [];
+  let usedIdx = loadUsedIdx();
   const pool = REWARDS.map((_,i)=>i).filter(i=>!usedIdx.includes(i));
   const idx = pool[Math.floor(Math.random()*pool.length)];
   usedIdx.push(idx);
+  saveUsedIdx(usedIdx);
   return REWARDS[idx];
 }
 
