@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>James' Sudoku Palace</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #f5f0e8;
+    --cream-dark: #ede7d9;
+    --ink: #1a1714;
+    --ink-light: #4a4540;
+    --ink-muted: #9a8f85;
+    --gold: #c8972a;
+    --gold-light: #f0d898;
+    --gold-bg: #fdf6e3;
+    --red: #c0392b;
+    --green: #2d7a4f;
+    --blue: #2c5f8a;
+    --shadow: 0 8px 40px rgba(26,23,20,0.12);
+  }
+
+  body {
+    background: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 64px;
+    position: relative;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 10% 10%, rgba(200,151,42,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 90%, rgba(44,95,138,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none; opacity: 0.5;
+  }
+
+  header { text-align: center; margin-bottom: 28px; }
+  .gift-tag {
+    display: inline-block;
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--gold); border: 1.5px solid var(--gold-light); border-radius: 20px;
+    padding: 4px 14px; margin-bottom: 12px; background: var(--gold-bg);
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3rem); font-weight: 900;
+    color: var(--ink); line-height: 1.1; letter-spacing: -0.02em;
+  }
+  h1 span { color: var(--gold); }
+  .subtitle { font-size: 13px; color: var(--ink-muted); margin-top: 6px; font-weight: 300; letter-spacing: 0.05em; }
+
+  .app { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 16px; }
+  .card { background: #fff; border-radius: 16px; box-shadow: var(--shadow); border: 1px solid rgba(200,151,42,0.15); overflow: hidden; }
+
+  /* Stats */
+  .stats-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--ink); color: #fff; gap: 12px; }
+  .stat { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .stat-label { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.5); font-family: 'DM Mono', monospace; }
+  .stat-value { font-family: 'DM Mono', monospace; font-size: 18px; font-weight: 500; color: #fff; }
+  .stat-value.red { color: #e74c3c; }
+  .stat-value.gold { color: var(--gold-light); }
+  .stat-divider { width: 1px; height: 32px; background: rgba(255,255,255,0.12); }
+
+  /* Difficulty */
+  .difficulty-row { display: flex; align-items: center; gap: 8px; padding: 12px 20px; border-bottom: 1px solid var(--cream-dark); background: var(--cream); }
+  .diff-label { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--ink-muted); letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0; }
+  .diff-btns { display: flex; gap: 6px; flex: 1; }
+  .diff-btn { flex: 1; padding: 6px 0; border: 1.5px solid var(--cream-dark); border-radius: 8px; background: transparent; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: var(--ink-muted); transition: all 0.18s ease; }
+  .diff-btn:hover { border-color: var(--gold); color: var(--gold); }
+  .diff-btn.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .diff-btn.active.easy  { background: var(--green); border-color: var(--green); }
+  .diff-btn.active.medium{ background: var(--blue);  border-color: var(--blue);  }
+  .diff-btn.active.hard  { background: var(--red);   border-color: var(--red);   }
+
+  /* Grid */
+  .grid-wrap { padding: 20px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    border: 3px solid #1a1714;
+    border-radius: 3px;
+    overflow: visible; /* allow glow to escape */
+    aspect-ratio: 1;
+    width: 100%;
+  }
+
+  .cell {
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-family: 'DM Mono', monospace;
+    font-size: clamp(14px, 3vw, 20px); font-weight: 400; color: var(--ink);
+    background: #fff; transition: background 0.12s ease, box-shadow 0.25s ease;
+    position: relative; user-select: none; -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+  .cell.given        { font-weight: 500; color: var(--ink); }
+  .cell.user-entered { color: var(--blue); font-weight: 400; }
+  .cell.error        { color: var(--red)  !important; background: rgba(192,57,43,0.06) !important; }
+  .cell.selected     { background: var(--gold-bg) !important; }
+  .cell.highlighted  { background: #f8f5f0; }
+  .cell.same-number  { background: rgba(200,151,42,0.12); }
+  .cell:hover:not(.given) { background: #fdf6e3; }
+
+  /* ── Gem solved glow — no indicator during play, revealed after win ── */
+  .cell.gem-solved {
+    overflow: visible;
+    background: rgba(200,151,42,0.1) !important;
+    box-shadow:
+      inset 0 0 0 2px #c8972a,
+      0 0 10px 3px rgba(200,151,42,0.6),
+      0 0 24px 7px rgba(200,151,42,0.25);
+    z-index: 2;
+    animation: gemGlow 1.8s ease-in-out infinite;
+  }
+  @keyframes gemGlow {
+    0%,100% {
+      box-shadow: inset 0 0 0 2px #c8972a, 0 0 8px 2px rgba(200,151,42,0.55), 0 0 18px 5px rgba(200,151,42,0.2);
+    }
+    50% {
+      box-shadow: inset 0 0 0 2.5px #f0c040, 0 0 20px 8px rgba(200,151,42,0.8), 0 0 36px 12px rgba(200,151,42,0.35);
+    }
+  }
+
+  /* Pencil marks */
+  .pencil-grid { display: grid; grid-template-columns: repeat(3,1fr); grid-template-rows: repeat(3,1fr); width: 100%; height: 100%; padding: 1px; }
+  .pencil-num { font-size: clamp(7px,1.5vw,9px); color: var(--ink-muted); display: flex; align-items: center; justify-content: center; font-family: 'DM Mono', monospace; line-height: 1; }
+  .pencil-num.visible { color: var(--ink-light); }
+
+  /* Numpad */
+  .numpad-wrap { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+  .mode-row { display: flex; gap: 8px; align-items: center; }
+  .mode-btn { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border: 1.5px solid var(--cream-dark); border-radius: 8px; background: transparent; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: var(--ink-muted); transition: all 0.15s; }
+  .mode-btn.active { border-color: var(--ink); background: var(--ink); color: #fff; }
+  .mode-btn svg { width: 14px; height: 14px; }
+  .numpad { display: grid; grid-template-columns: repeat(9,1fr); gap: 6px; }
+  .num-btn { aspect-ratio: 1; border: 1.5px solid var(--cream-dark); border-radius: 10px; background: #fff; cursor: pointer; font-family: 'DM Mono', monospace; font-size: clamp(14px,2.5vw,18px); font-weight: 500; color: var(--ink); transition: all 0.14s; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); -webkit-tap-highlight-color: transparent; }
+  .num-btn:hover { border-color: var(--gold); color: var(--gold); transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.08); }
+  .num-btn:active { transform: translateY(0); }
+  .num-btn.completed { opacity: 0.3; pointer-events: none; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .action-btn { flex: 1; min-width: 80px; padding: 10px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; background: #fff; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; color: var(--ink-light); transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.04); }
+  .action-btn:hover { border-color: var(--ink); color: var(--ink); }
+  .action-btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .action-btn.primary:hover { background: var(--ink-light); }
+  .action-btn.danger:hover { border-color: var(--red); color: var(--red); }
+
+  /* ── Inline Win Panel — slides in below the board ── */
+  .win-panel {
+    display: none;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(200,151,42,0.2);
+    overflow: hidden;
+    animation: slideUp 0.5s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .win-panel.show { display: block; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(28px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Dark celebration banner */
+  .win-banner {
+    background: var(--ink);
+    padding: 26px 22px 20px;
+    text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .win-banner::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 70% 55% at 50% 0%, rgba(200,151,42,0.22) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .win-emoji { font-size: 42px; margin-bottom: 10px; position: relative; display: block; }
+  .win-title { font-family: 'Playfair Display', serif; font-size: 24px; font-weight: 900; color: #fff; margin-bottom: 5px; position: relative; }
+  .win-subtitle { font-size: 13px; color: rgba(255,255,255,0.58); line-height: 1.5; margin-bottom: 18px; position: relative; }
+  .win-stats { display: flex; gap: 12px; justify-content: center; margin-bottom: 18px; position: relative; }
+  .win-stat { text-align: center; background: rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 20px; }
+  .win-stat-val { font-family: 'DM Mono', monospace; font-size: 20px; font-weight: 500; color: var(--gold-light); }
+  .win-stat-lbl { font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.38); font-family: 'DM Mono', monospace; margin-top: 2px; }
+  .win-actions { display: flex; gap: 10px; position: relative; }
+  .win-btn { flex: 1; padding: 11px; border-radius: 10px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; transition: all 0.15s; }
+  .win-btn.outline { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.82); border: 1.5px solid rgba(255,255,255,0.14); }
+  .win-btn.outline:hover { background: rgba(255,255,255,0.16); }
+  .win-btn.gold { background: var(--gold); color: #fff; }
+  .win-btn.gold:hover { background: #b5841a; }
+
+  /* Gem challenge bar — sits below banner, board visible above by scrolling */
+  .gem-bar {
+    padding: 20px 20px 22px;
+    background: linear-gradient(160deg, #fffcf2 0%, #fff8e3 100%);
+    border-top: 1px solid rgba(200,151,42,0.18);
+  }
+  .gem-bar-heading {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+  }
+  .gem-bar-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: var(--ink); }
+  .gem-scroll-tip {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(200,151,42,0.1); border: 1px solid rgba(200,151,42,0.25);
+    border-radius: 8px; padding: 7px 12px; margin-bottom: 14px;
+    font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.1em;
+    color: var(--gold); text-transform: uppercase;
+  }
+  .gem-scroll-tip svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .gem-desc { font-size: 12.5px; color: var(--ink-muted); line-height: 1.65; margin-bottom: 14px; }
+  .gem-desc strong { color: var(--ink-light); }
+  .gem-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .gem-row { display: flex; align-items: center; gap: 9px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-muted); }
+  .gem-badge {
+    display: inline-flex; align-items: center;
+    background: #fff; border: 1.5px solid var(--gold-light);
+    border-radius: 6px; padding: 3px 10px;
+    color: var(--gold); font-size: 10px; white-space: nowrap; flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(200,151,42,0.25);
+  }
+  /* Inputs */
+  .gem-inputs { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; justify-content: center; }
+  .gem-inp {
+    width: 58px; height: 66px;
+    border: 2px solid var(--gold-light); border-radius: 13px; background: #fff;
+    font-family: 'DM Mono', monospace; font-size: 32px; font-weight: 500;
+    color: var(--ink); text-align: center; outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 8px rgba(200,151,42,0.08);
+  }
+  .gem-inp:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,151,42,0.18), 0 2px 8px rgba(200,151,42,0.15); }
+  .gem-inp.err { animation: shake 0.42s ease; border-color: var(--red); }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+  .gem-sep { color: var(--gold); font-size: 20px; opacity: 0.38; font-weight: 300; }
+  .gem-claim {
+    width: 100%; padding: 13px; border: none; border-radius: 12px;
+    background: linear-gradient(135deg, #c8972a, #a87218);
+    color: #fff; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s, transform 0.15s; letter-spacing: 0.04em;
+  }
+  .gem-claim:hover { opacity: 0.88; transform: translateY(-1px); }
+  .gem-claim:active { transform: translateY(0); }
+
+  /* Reward */
+  .reward-panel {
+    display: none; background: var(--ink); border-radius: 13px;
+    padding: 22px 18px; text-align: center; margin-top: 14px;
+    position: relative; overflow: hidden;
+    animation: popIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .reward-panel.show { display: block; }
+  .reward-panel::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 75% 55% at 50% 0%, rgba(200,151,42,0.22) 0%, transparent 68%); pointer-events: none; }
+  @keyframes popIn { from{transform:scale(0.82);opacity:0} to{transform:scale(1);opacity:1} }
+  .rw-type { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold-light); opacity: 0.72; margin-bottom: 8px; position: relative; }
+  .rw-emoji { font-size: 36px; display: block; margin-bottom: 9px; position: relative; }
+  .rw-text { font-size: 13px; line-height: 1.78; color: rgba(255,255,255,0.88); position: relative; }
+  .rw-text em { color: var(--gold-light); font-style: normal; font-weight: 600; }
+  .rw-another { margin-top: 14px; padding: 7px 18px; border: 1.5px solid rgba(200,151,42,0.38); border-radius: 20px; background: transparent; color: var(--gold-light); font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; position: relative; }
+  .rw-another:hover { background: rgba(200,151,42,0.12); border-color: var(--gold-light); }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--ink); color: #fff; padding: 10px 20px; border-radius: 100px; font-size: 13px; font-weight: 500; z-index: 200; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); white-space: nowrap; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 400px) {
+    .numpad{gap:4px} .num-btn{border-radius:8px} h1{font-size:1.7rem}
+    .gem-inp{width:50px;height:58px;font-size:26px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="gift-tag">HAVE FUN!</div>
+  <h1>Su<span>doku</span></h1>
+  <p class="subtitle">The timeless puzzle of logic &amp; patience</p>
+</header>
+
+<div class="app">
+
+  <!-- Game card -->
+  <div class="card">
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-label">Time</span>
+        <span class="stat-value gold" id="timer">00:00</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-label">Mistakes</span>
+        <span class="stat-value red" id="mistakes">0 / 3</span>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <span class="stat-label">Level</span>
+        <span class="stat-value" id="level-display">Medium</span>
+      </div>
+    </div>
+
+    <div class="difficulty-row">
+      <span class="diff-label">Level:</span>
+      <div class="diff-btns">
+        <button class="diff-btn easy"   onclick="setDifficulty('easy')">Easy</button>
+        <button class="diff-btn medium active" onclick="setDifficulty('medium')">Medium</button>
+        <button class="diff-btn hard"   onclick="setDifficulty('hard')">Hard</button>
+      </div>
+    </div>
+
+    <div class="grid-wrap">
+      <div class="grid" id="grid"></div>
+    </div>
+
+    <div class="numpad-wrap">
+      <div class="mode-row">
+        <button class="mode-btn active" id="mode-normal" onclick="setMode('normal')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Normal
+        </button>
+        <button class="mode-btn" id="mode-pencil" onclick="setMode('pencil')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+          Pencil
+        </button>
+        <button class="mode-btn" id="mode-erase" onclick="eraseCell()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l10-10 7 7-3.5 3.5M6.5 17.5l-2-2"/></svg>
+          Erase
+        </button>
+      </div>
+      <div class="numpad" id="numpad"></div>
+      <div class="actions">
+        <button class="action-btn" onclick="checkPuzzle()">✓ Check</button>
+        <button class="action-btn" onclick="hintCell()">💡 Hint</button>
+        <button class="action-btn danger" onclick="resetPuzzle()">↺ Reset</button>
+        <button class="action-btn primary" onclick="newPuzzle()">New Puzzle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Win panel — inline, board stays visible above ── -->
+  <div class="win-panel" id="win-panel">
+    <div class="win-banner">
+      <span class="win-emoji">🎉</span>
+      <div class="win-title">Puzzle Solved!</div>
+      <div class="win-subtitle" id="win-subtitle">Beautifully done.</div>
+      <div class="win-stats">
+        <div class="win-stat">
+          <div class="win-stat-val" id="win-time">—</div>
+          <div class="win-stat-lbl">Time</div>
+        </div>
+        <div class="win-stat">
+          <div class="win-stat-val" id="win-mistakes">—</div>
+          <div class="win-stat-lbl">Mistakes</div>
+        </div>
+      </div>
+      <div class="win-actions">
+        <button class="win-btn outline" onclick="newPuzzle()">↺ New Puzzle</button>
+        <button class="win-btn gold" onclick="scrollToBoard()">↑ View Board &amp; Gems</button>
+      </div>
+    </div>
+
+    <div class="gem-bar">
+      <div class="gem-bar-heading">
+        <div class="gem-bar-title">✦ The Gems of Insight</div>
+      </div>
+      <div class="gem-scroll-tip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        Scroll up — three cells on the board are glowing gold
+      </div>
+      <div class="gem-desc">
+        Spot the <strong>three glowing gem cells</strong> on the solved board above.
+        Enter their digits below — in order — to unlock your secret reward.
+      </div>
+      <div class="gem-list" id="gem-list"></div>
+      <div class="gem-inputs">
+        <input class="gem-inp" id="g1" maxlength="1" inputmode="numeric" placeholder="·" autocomplete="off"
+               oninput="gemNext(this,'g2')" />
+        <span class="gem-sep">—</span>
+        <input class="gem-inp" id="g2" maxlength="1" inputmode="numeric" placeholder="·" autocomplete="off"
+               oninput="gemNext(this,'g3')" onkeydown="gemBack(event,this,'g1')" />
+        <span class="gem-sep">—</span>
+        <input class="gem-inp" id="g3" maxlength="1" inputmode="numeric" placeholder="·" autocomplete="off"
+               oninput="gemNext(this,null)" onkeydown="gemBack(event,this,'g2')" />
+      </div>
+      <button class="gem-claim" onclick="claimReward()">✦ Claim Your Reward</button>
+
+      <div class="reward-panel" id="reward-panel">
+        <div class="rw-type" id="rw-type">Fun Fact</div>
+        <span class="rw-emoji" id="rw-emoji">🌟</span>
+        <div class="rw-text" id="rw-text"></div>
+        <button class="rw-another" onclick="anotherReward()">↻ Another one</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.app -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  GEM CELLS (0-indexed)  R2C2 · R5C5 · R8C7
+// ══════════════════════════════════════════════════
+const GEM_CELLS = [
+  { r: 1, c: 1, label: 'Gem 1', coord: 'Row 2, Column 2' },
+  { r: 4, c: 4, label: 'Gem 2', coord: 'Row 5, Column 5' },
+  { r: 7, c: 6, label: 'Gem 3', coord: 'Row 8, Column 7' },
+];
+
+function isGemCell(r, c) { return GEM_CELLS.some(g => g.r===r && g.c===c); }
+
+// ══════════════════════════════════════════════════
+//  REWARD POOL
+// ══════════════════════════════════════════════════
+const REWARDS = [
+  { type:'Industry Wisdom', emoji:'📊', text:`John Wanamaker, the great department store magnate, famously said: <em>"Half the money I spend on advertising is wasted — the trouble is, I don't know which half."</em> He said this in the 1800s. The entire digital analytics industry was essentially invented just to answer his question. We're still not entirely sure we have.` },
+  { type:'Advertising Lore', emoji:'📺', text:`The very first television advertisement aired on <em>1st July 1941</em> — a ten-second spot for Bulova watches, shown before a baseball game. It cost nine dollars. The watch displayed the correct time. It remains, proportionally, the most efficient media spend in the history of the industry.` },
+  { type:'Creative Industry', emoji:'✍️', text:`David Ogilvy's most celebrated headline — <em>"At 60 miles an hour, the loudest noise in the new Rolls-Royce comes from the electric clock"</em> — was not written by Ogilvy. He found the line buried in a Rolls-Royce engineering document. His genius was recognising it, leaving it completely alone, and putting it on a page.` },
+  { type:'Brand Strategy', emoji:'🔔', text:`The Michelin Guide — one of the world's most coveted restaurant rating systems — was created by a <em>tyre company in 1900</em> to encourage more driving so tyres would wear out faster. It accidentally became the highest authority in fine dining. The greatest piece of content marketing ever executed, by people who sold rubber.` },
+  { type:'Advertising Truth', emoji:'🎯', text:`The average person is exposed to between <em>4,000 and 10,000 advertisements every single day.</em> Most people can recall roughly three brand names unprompted. Advertising: the magnificent, enduring triumph of hope over recall rates.` },
+  { type:'Industry Observation', emoji:'💼', text:`An account director once defined <em>"synergy"</em> in a client debrief as: "two departments blaming each other simultaneously, but in a shared deck." The client nodded thoughtfully and said it was the clearest explanation they'd ever heard. It won the pitch.` },
+  { type:'Zoology', emoji:'🐙', text:`Octopuses have <em>three hearts, nine brains, and blue blood.</em> Two hearts pump blood to the gills; a third pumps it to the body. Each arm has its own neural cluster and can act semi-independently. They can unscrew jars, recognise individual human faces, and appear to dream. They are, by most measures, more interesting than most people at dinner parties.` },
+  { type:'Botany Surprise', emoji:'🍌', text:`Bananas are technically berries. Strawberries are not. Neither are raspberries or blackberries. Avocados, watermelons, and aubergines are all berries. <em>Botanists appear to have agreed on a classification system specifically designed to upset everyone at a farmers' market.</em>` },
+  { type:'Animal Kingdom', emoji:'🦈', text:`<em>Sharks are older than trees.</em> Sharks have patrolled the oceans for approximately 450 million years. Trees appeared around 350 million years ago. Sharks predate forests, the dinosaurs, and very nearly predate boredom itself. They have changed remarkably little since. It suggests the design was correct.` },
+  { type:'Biology Fact', emoji:'🐝', text:`Honey never spoils. Archaeologists found <em>3,000-year-old honey in Egyptian tombs that was still perfectly edible.</em> The chemistry — low moisture, high acidity, trace hydrogen peroxide — creates an environment where bacteria simply cannot survive. The ancient Egyptians invented the world's finest natural preservative and mainly used it to sweeten things.` },
+  { type:'Zoology Gem', emoji:'🦩', text:`A group of flamingos is called a <em>flamboyance.</em> A group of owls is a parliament. A group of crows is a murder. A group of cats is a clowder. A group of porcupines is a prickle. Whoever was responsible for naming animal collectives was having the most extraordinary, unchaperoned afternoon.` },
+  { type:'Living Structures', emoji:'🦷', text:`Your skeleton is not a passive scaffold — <em>it is a living organ</em> in constant renewal. Cells called osteoclasts dissolve old bone while osteoblasts build new tissue. You replace roughly 10% of your skeleton each year. The skeleton you carry at 40 is entirely different material from the one you had at 30.` },
+  { type:'Space Science', emoji:'⚡', text:`A single bolt of lightning is <em>five times hotter than the surface of the sun.</em> The sun burns at around 5,500°C. A lightning bolt reaches 30,000°C — and sustains this for approximately 30 microseconds. The sun has been burning for 4.6 billion years. Lightning beats its temperature in the time it takes to blink.` },
+  { type:'Planetary Curiosity', emoji:'🌍', text:`<em>A day on Venus is longer than a year on Venus.</em> It rotates so slowly on its axis that it completes a full orbit around the sun before finishing a single spin. It also rotates backwards relative to most planets. Venus is doing things entirely on its own terms and has been for 4.5 billion years.` },
+  { type:'Cosmic Scale', emoji:'🌳', text:`There are more trees on Earth than stars in the Milky Way. Our galaxy contains an estimated <em>200 to 400 billion stars.</em> Earth holds approximately <em>3 trillion trees.</em> We live on a planet swimming in life, inside a galaxy of suns, and we mostly worry about the weather.` },
+  { type:'Historical Perspective', emoji:'🏛️', text:`<em>Cleopatra lived closer in time to the Moon landing than to the construction of the Great Pyramid.</em> The pyramids were built around 2560 BC. Cleopatra reigned around 30 BC. The Moon landing was 1969. She was, by the standards of her era, practically a contemporary of astronauts.` },
+  { type:'Academic History', emoji:'📚', text:`<em>Oxford University is older than the Aztec Empire.</em> Teaching began at Oxford around 1096 AD. The Aztec Empire was founded in 1428 AD — more than three centuries later. Some institutions simply have more practice at being difficult to understand.` },
+  { type:'Engineering Curiosity', emoji:'🗼', text:`The Eiffel Tower grows approximately <em>15 centimetres taller in summer</em> due to thermal expansion of the iron. On hot days it also leans very slightly away from the sun. It is, structurally and temperamentally, considerably more relatable than it appears.` },
+  { type:'Linguistic Fact', emoji:'🌧️', text:`The smell of rain on dry earth has a name: <em>petrichor.</em> It was coined in 1964 by two Australian scientists who identified the compound — a mix of plant oils and actinomycetes bacteria — responsible for it. Before 1964, everyone simply called it "that lovely smell" and went outside immediately.` },
+  { type:'Mathematics', emoji:'♟️', text:`There are more possible games of chess than there are <em>atoms in the observable universe.</em> The estimated number of possible chess games is 10 to the power of 120 — the Shannon Number. The observable universe contains roughly 10 to the power of 80 atoms. And yet your uncle still only knows one opening and it doesn't work.` },
+  { type:'Sensory Science', emoji:'👃', text:`The human nose can detect <em>over one trillion distinct smells.</em> It is one of the most exquisitely sensitive instruments ever evolved — capable of tracking chemical traces, navigating memories, and detecting emotional states. It cannot, however, locate the source of that smell in the fridge. That remains unsolved.` },
+  { type:'Atmospheric Science', emoji:'☁️', text:`The average cumulus cloud weighs approximately <em>500,000 kilograms</em> — roughly 80 adult African elephants. They float because the water droplets are so small and dispersed that upward air currents support them effortlessly. The sky is quietly carrying the weight of elephant herds and simply doesn't mention it.` },
+  { type:'Zoology & Science', emoji:'🐨', text:`Wombats produce <em>cube-shaped droppings</em> — the only known animal in the world to do so. In 2019, researchers identified the mechanism: varying elasticity in the wombat's intestine shapes the material as it forms. This work won an Ig Nobel Prize. A genuinely excellent use of a doctorate.` },
+];
+
+let usedIdx = [];
+function getNextReward() {
+  if (usedIdx.length >= REWARDS.length) usedIdx = [];
+  const pool = REWARDS.map((_,i)=>i).filter(i=>!usedIdx.includes(i));
+  const idx = pool[Math.floor(Math.random()*pool.length)];
+  usedIdx.push(idx);
+  return REWARDS[idx];
+}
+
+// ── Gem inputs ──
+function gemNext(el, nextId) {
+  el.value = el.value.replace(/[^0-9]/g,'').slice(-1);
+  if (el.value && nextId) document.getElementById(nextId).focus();
+}
+function gemBack(e, el, prevId) {
+  if (e.key==='Backspace' && !el.value) document.getElementById(prevId).focus();
+}
+
+function claimReward() {
+  const v1=document.getElementById('g1').value.trim();
+  const v2=document.getElementById('g2').value.trim();
+  const v3=document.getElementById('g3').value.trim();
+  const c1=String(solved[GEM_CELLS[0].r][GEM_CELLS[0].c]);
+  const c2=String(solved[GEM_CELLS[1].r][GEM_CELLS[1].c]);
+  const c3=String(solved[GEM_CELLS[2].r][GEM_CELLS[2].c]);
+
+  if (v1===c1 && v2===c2 && v3===c3) {
+    revealReward();
+  } else {
+    ['g1','g2','g3'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.classList.remove('err'); void el.offsetWidth; el.classList.add('err');
+      setTimeout(()=>el.classList.remove('err'),500);
+    });
+    showToast('Those digits don\'t match — scroll up and find the glowing cells!');
+  }
+}
+
+function revealReward() {
+  const r = getNextReward();
+  document.getElementById('rw-type').textContent  = r.type;
+  document.getElementById('rw-emoji').textContent = r.emoji;
+  document.getElementById('rw-text').innerHTML    = r.text;
+  const panel = document.getElementById('reward-panel');
+  panel.classList.add('show');
+  setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}), 60);
+}
+
+function anotherReward() {
+  const r = getNextReward();
+  document.getElementById('rw-type').textContent  = r.type;
+  document.getElementById('rw-emoji').textContent = r.emoji;
+  document.getElementById('rw-text').innerHTML    = r.text;
+}
+
+function buildGemList() {
+  const list = document.getElementById('gem-list');
+  list.innerHTML = '';
+  GEM_CELLS.forEach(g=>{
+    const row = document.createElement('div');
+    row.className = 'gem-row';
+    row.innerHTML = `<span class="gem-badge">✦ ${g.label}</span>${g.coord}`;
+    list.appendChild(row);
+  });
+}
+
+function scrollToBoard() {
+  document.querySelector('.card').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ══════════════════════════════════════════════════
+//  SUDOKU ENGINE
+// ══════════════════════════════════════════════════
+
+function generateSolved() {
+  const board = Array.from({length:9},()=>Array(9).fill(0));
+  fill(board); return board;
+}
+
+function isValid(board,row,col,num) {
+  for (let i=0;i<9;i++){
+    if(board[row][i]===num||board[i][col]===num) return false;
+  }
+  const br=Math.floor(row/3)*3, bc=Math.floor(col/3)*3;
+  for(let r=br;r<br+3;r++) for(let c=bc;c<bc+3;c++) if(board[r][c]===num) return false;
+  return true;
+}
+
+function fill(board) {
+  for(let row=0;row<9;row++){
+    for(let col=0;col<9;col++){
+      if(board[row][col]===0){
+        for(const n of shuffle([1,2,3,4,5,6,7,8,9])){
+          if(isValid(board,row,col,n)){
+            board[row][col]=n;
+            if(fill(board)) return true;
+            board[row][col]=0;
+          }
+        }
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+// Count solutions up to `limit` (stops at 2 for uniqueness check)
+function countSolutions(board, limit) {
+  for (let i = 0; i < 81; i++) {
+    const r = Math.floor(i / 9), c = i % 9;
+    if (board[r][c] === 0) {
+      let count = 0;
+      for (let n = 1; n <= 9; n++) {
+        if (isValid(board, r, c, n)) {
+          board[r][c] = n;
+          count += countSolutions(board, limit - count);
+          board[r][c] = 0;
+          if (count >= limit) return count;
+        }
+      }
+      return count;
+    }
+  }
+  return 1; // fully solved
+}
+
+function removeCells(solved, difficulty) {
+  const targets = { easy: 30, medium: 45, hard: 55 };
+  const target  = targets[difficulty];
+  const puzzle  = solved.map(r => [...r]);
+  let removed   = 0;
+
+  for (const idx of shuffle([...Array(81).keys()])) {
+    if (removed >= target) break;
+    const r = Math.floor(idx / 9), c = idx % 9;
+    const backup = puzzle[r][c];
+    puzzle[r][c] = 0;
+    // Only accept removal if puzzle still has exactly 1 solution
+    if (countSolutions(puzzle.map(row => [...row]), 2) === 1) {
+      removed++;
+    } else {
+      puzzle[r][c] = backup; // restore — would cause ambiguity
+    }
+  }
+  return puzzle;
+}
+
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+
+let solved, puzzle, userBoard, pencilBoard, selected, mode, mistakes, timerSec, timerInt, difficulty, hintsUsed, puzzleSolved;
+
+function init(diff) {
+  difficulty = diff||'medium';
+  solved     = generateSolved();
+  puzzle     = removeCells(solved, difficulty);
+  userBoard  = puzzle.map(r=>[...r]);
+  pencilBoard= Array.from({length:9},()=>Array.from({length:9},()=>new Set()));
+  selected=null; mode='normal'; mistakes=0; hintsUsed=0; timerSec=0; puzzleSolved=false;
+  if(timerInt) clearInterval(timerInt);
+  timerInt = setInterval(()=>{timerSec++;updateTimer();},1000);
+  updateTimer(); updateMistakes(); setMode('normal');
+  renderGrid(); renderNumpad();
+  // Hide win panel on new puzzle
+  document.getElementById('win-panel').classList.remove('show');
+  document.getElementById('level-display').textContent = diff.charAt(0).toUpperCase()+diff.slice(1);
+}
+
+function setDifficulty(d){
+  document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector(`.diff-btn.${d}`).classList.add('active');
+  init(d);
+}
+
+function newPuzzle(){ init(difficulty); }
+
+function resetPuzzle(){
+  userBoard=puzzle.map(r=>[...r]);
+  pencilBoard=Array.from({length:9},()=>Array.from({length:9},()=>new Set()));
+  mistakes=0;hintsUsed=0;timerSec=0;puzzleSolved=false;
+  updateMistakes(); selected=null;
+  document.getElementById('win-panel').classList.remove('show');
+  renderGrid();
+}
+
+function setMode(m){
+  mode=m;
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('mode-'+m);
+  if(el) el.classList.add('active');
+}
+
+function updateTimer(){
+  const m=String(Math.floor(timerSec/60)).padStart(2,'0');
+  const s=String(timerSec%60).padStart(2,'0');
+  document.getElementById('timer').textContent=`${m}:${s}`;
+}
+function updateMistakes(){ document.getElementById('mistakes').textContent=`${mistakes} / 3`; }
+function formatTime(sec){ return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'); }
+
+// ══════════════════════════════════════════════════
+//  GRID RENDER
+// ══════════════════════════════════════════════════
+
+function renderGrid(){
+  const grid=document.getElementById('grid');
+  grid.innerHTML='';
+  const BOX ='2.5px solid #1a1714';
+  const THIN='1px solid #c8b89a';
+  const NONE='none';
+
+  for(let r=0;r<9;r++){
+    for(let c=0;c<9;c++){
+      const cell=document.createElement('div');
+      cell.className='cell';
+      cell.dataset.r=r; cell.dataset.c=c;
+
+      // Borders (all set in JS for precision)
+      cell.style.borderRight =(c===8)?NONE:(c===2||c===5)?BOX:THIN;
+      cell.style.borderBottom=(r===8)?NONE:(r===2||r===5)?BOX:THIN;
+      cell.style.borderLeft  =NONE;
+      cell.style.borderTop   =NONE;
+
+      const isGiven=puzzle[r][c]!==0;
+      if(isGiven) cell.classList.add('given');
+
+      // Gem glow — only after puzzle is solved
+      if(puzzleSolved && isGemCell(r,c)) cell.classList.add('gem-solved');
+
+      const val=userBoard[r][c];
+      if(val!==0){
+        if(!isGiven) cell.classList.add('user-entered');
+        cell.textContent=val;
+      } else {
+        const marks=pencilBoard[r][c];
+        if(marks.size>0){
+          const pg=document.createElement('div');
+          pg.className='pencil-grid';
+          for(let n=1;n<=9;n++){
+            const pn=document.createElement('div');
+            pn.className='pencil-num'+(marks.has(n)?' visible':'');
+            pn.textContent=marks.has(n)?n:'';
+            pg.appendChild(pn);
+          }
+          cell.appendChild(pg);
+        }
+      }
+      cell.addEventListener('click',()=>selectCell(r,c));
+      grid.appendChild(cell);
+    }
+  }
+  applyHighlights();
+}
+
+function selectCell(r,c){ selected={r,c}; applyHighlights(); }
+
+function applyHighlights(){
+  document.querySelectorAll('.cell').forEach(cell=>{
+    cell.classList.remove('selected','highlighted','same-number','error');
+    const r=+cell.dataset.r, c=+cell.dataset.c;
+    const val=userBoard[r][c];
+    if(!selected) return;
+    const{r:sr,c:sc}=selected;
+    const sval=userBoard[sr][sc];
+    if(r===sr&&c===sc) cell.classList.add('selected');
+    else if(r===sr||c===sc||(Math.floor(r/3)===Math.floor(sr/3)&&Math.floor(c/3)===Math.floor(sc/3))) cell.classList.add('highlighted');
+    if(sval!==0&&val===sval) cell.classList.add('same-number');
+    if(puzzle[r][c]===0&&val!==0&&val!==solved[r][c]) cell.classList.add('error');
+  });
+}
+
+// ══════════════════════════════════════════════════
+//  NUMPAD & INPUT
+// ══════════════════════════════════════════════════
+
+function renderNumpad(){
+  const numpad=document.getElementById('numpad');
+  numpad.innerHTML='';
+  for(let n=1;n<=9;n++){
+    const btn=document.createElement('button');
+    btn.className='num-btn';btn.textContent=n;btn.dataset.num=n;
+    btn.addEventListener('click',()=>inputNum(n));
+    numpad.appendChild(btn);
+  }
+  updateNumpadCompleted();
+}
+
+function updateNumpadCompleted(){
+  const counts=Array(10).fill(0);
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(userBoard[r][c]!==0) counts[userBoard[r][c]]++;
+  document.querySelectorAll('.num-btn').forEach(btn=>btn.classList.toggle('completed',counts[+btn.dataset.num]>=9));
+}
+
+function inputNum(n){
+  if(!selected){showToast('Select a cell first');return;}
+  const{r,c}=selected;
+  if(puzzle[r][c]!==0) return;
+  if(mode==='pencil'){
+    userBoard[r][c]=0;
+    const marks=pencilBoard[r][c];
+    marks.has(n)?marks.delete(n):marks.add(n);
+    renderGrid();return;
+  }
+  if(userBoard[r][c]===n){userBoard[r][c]=0;pencilBoard[r][c].clear();renderGrid();updateNumpadCompleted();return;}
+  pencilBoard[r][c].clear();
+  userBoard[r][c]=n;
+  if(n!==solved[r][c]){
+    mistakes++;updateMistakes();
+    if(mistakes>=3){clearInterval(timerInt);showToast('3 mistakes — puzzle reset!');setTimeout(()=>resetPuzzle(),1200);renderGrid();return;}
+    showToast('Not quite right!');
+  }
+  renderGrid();updateNumpadCompleted();checkWin();
+}
+
+function eraseCell(){
+  if(!selected)return;
+  const{r,c}=selected;
+  if(puzzle[r][c]!==0)return;
+  userBoard[r][c]=0;pencilBoard[r][c].clear();
+  renderGrid();updateNumpadCompleted();
+}
+
+function checkPuzzle(){
+  let correct=0,incorrect=0,empty=0;
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++){
+    if(puzzle[r][c]!==0)continue;
+    if(userBoard[r][c]===0)empty++;
+    else if(userBoard[r][c]===solved[r][c])correct++;
+    else incorrect++;
+  }
+  if(incorrect>0) showToast(`${incorrect} cell${incorrect>1?'s':''} need fixing`);
+  else if(empty>0) showToast(`${correct} correct · ${empty} remaining`);
+  else showToast('Everything looks perfect!');
+}
+
+function hintCell(){
+  if(!selected){showToast('Select a cell for a hint');return;}
+  const{r,c}=selected;
+  if(puzzle[r][c]!==0){showToast("That's a given cell");return;}
+  if(userBoard[r][c]===solved[r][c]&&userBoard[r][c]!==0){showToast('Already correct!');return;}
+  hintsUsed++;userBoard[r][c]=solved[r][c];pencilBoard[r][c].clear();
+  renderGrid();updateNumpadCompleted();showToast('Hint placed');checkWin();
+}
+
+// ══════════════════════════════════════════════════
+//  WIN
+// ══════════════════════════════════════════════════
+
+function checkWin(){
+  for(let r=0;r<9;r++) for(let c=0;c<9;c++) if(userBoard[r][c]!==solved[r][c]) return;
+  clearInterval(timerInt);
+  setTimeout(showWin, 400);
+}
+
+function showWin(){
+  puzzleSolved = true;
+  renderGrid(); // re-render to apply gem-solved glow
+
+  document.getElementById('win-time').textContent     = formatTime(timerSec);
+  document.getElementById('win-mistakes').textContent = mistakes;
+  const msgs=[
+    'Beautifully done. Every number in its rightful place.',
+    'A perfect solve. Logic at its finest.',
+    'Flawless! Your mind is a magnificent thing.',
+    'Done! That puzzle never stood a chance.',
+  ];
+  document.getElementById('win-subtitle').textContent = msgs[Math.floor(Math.random()*msgs.length)];
+
+  // Reset gem inputs & reward
+  ['g1','g2','g3'].forEach(id=>{document.getElementById(id).value='';document.getElementById(id).classList.remove('err');});
+  document.getElementById('reward-panel').classList.remove('show');
+  buildGemList();
+
+  const panel = document.getElementById('win-panel');
+  panel.classList.add('show');
+  // Scroll so top of win panel is visible — user can scroll up to see glowing board
+  setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'start'}), 100);
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ══════════════════════════════════════════════════
+//  KEYBOARD
+// ══════════════════════════════════════════════════
+
+document.addEventListener('keydown',e=>{
+  if(e.target.classList.contains('gem-inp')) return;
+  if(e.key>='1'&&e.key<='9') inputNum(+e.key);
+  if(e.key==='Backspace'||e.key==='Delete') eraseCell();
+  if(e.key==='p'||e.key==='P') setMode(mode==='pencil'?'normal':'pencil');
+  if(!selected)return;
+  const{r,c}=selected;
+  if(e.key==='ArrowUp'&&r>0)    selectCell(r-1,c);
+  if(e.key==='ArrowDown'&&r<8)  selectCell(r+1,c);
+  if(e.key==='ArrowLeft'&&c>0)  selectCell(r,c-1);
+  if(e.key==='ArrowRight'&&c<8) selectCell(r,c+1);
+});
+
+// Start!
+init('medium');
+</script>
+</body>
+</html>
